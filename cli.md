@@ -46,18 +46,18 @@ near call $REF register_tokens '{"token_ids": ["'$REF_ID'","'$WNEAR'","'$DAI_ID'
 
 ### 3. View pool by pool id:
 ```bash
-near view $REF get_pool '{"pool_id":17}'
+near view $REF get_pool '{"pool_id":50}'
 ```
 
 ### 4. Deposit token:
 ```bash
 near call $ETH_ID ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"1142356271134177","msg":""}' --accountId $USER_ID --depositYocto 1 --gas 80$TGAS
 
-near call $REF_ID ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"12754671387590000000000000","msg":""}' --accountId $USER_ID2 --depositYocto 1 --gas 35$TGAS
+near call $REF_ID ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"2099656072404060000000000","msg":""}' --accountId $USER_ID2 --depositYocto 1 --gas 35$TGAS
 
-near call $SKYWARD_ID ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"47131587787329900","msg":""}' --accountId $USER_ID2 --depositYocto 1 --gas 35$TGAS
+near call $SKYWARD_ID ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"2000000000000003693","msg":""}' --accountId $USER_ID2 --depositYocto 1 --gas 35$TGAS
 
-near call $WNEAR ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"30135445464001000000000000","msg":""}' --accountId $USER_ID2 --depositYocto 1 --gas 35$TGAS
+near call $WNEAR ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"4984347565080580000000000","msg":""}' --accountId $USER_ID2 --depositYocto 1 --gas 35$TGAS
 
 near call $DAI_ID ft_transfer_call '{"receiver_id":"'$CONTRACT_ID'","amount":"82877254348332300000","msg":""}' --accountId $USER_ID --depositYocto 1 --gas 80$TGAS
 ```
@@ -69,19 +69,23 @@ near view $CONTRACT_ID get_balance '{"account_id":"'$USER_ID'"}'
 
 ### 6. Call add liquidity:
 ```bash
-near call $CONTRACT_ID call_add_liquidity '{"pool_id":17,"amounts":["12754671387590000000000000","30135445464001000000000000"],"token1":"'$REF_ID'", "token2": "'$WNEAR'"}' --accountId $USER_ID2 --gas 300$TGAS
+near call $CONTRACT_ID call_add_liquidity '{"pool_id":17,"amounts":["2099656072404060000000000","4984347565080580000000000"],"token1":"'$REF_ID'", "token2": "'$WNEAR'"}' --accountId $USER_ID2 --gas 300$TGAS
 ```
 
 ### 7. Call remove liquidity:
 ```bash
-near call $CONTRACT_ID call_remove_liquidity '{"pool_id":50,"min_amounts":["542152994553529000","2875741196116000000000000"],"shares":"553717424932720000000000","token1":"'$SKYWARD_ID'", "token2": "'$WNEAR'"}' --accountId $USER_ID2 --gas 300$TGAS
-
-near call $CONTRACT_ID withdraw_max '{"token_id":"'$SKYWARD_ID'"}' --accountId $USER_ID2 --gas 100$TGAS
-
+near call $CONTRACT_ID call_remove_liquidity '{"pool_id":17,"min_amounts":["12690898030652000000000000","29984768236681000000000000"],"shares":"21799786546381006101493278010","token1":"'$REF_ID'", "token2": "'$WNEAR'"}' --accountId $USER_ID2 --gas 300$TGAS && \
+near call $CONTRACT_ID withdraw_max '{"token_id":"'$REF_ID'"}' --accountId $USER_ID2 --gas 100$TGAS && \
 near call $CONTRACT_ID withdraw_max '{"token_id":"'$WNEAR'"}' --accountId $USER_ID2 --gas 100$TGAS
 ```
 
-### 8. Some manual CLI on REF an tokens:
+## III. Add Farm:
+```bash
+near call $CONTRACT_ID call_mft_transfer_call '{"amount":"8312577166003884374257641527","pool_id":":17"}' --accountId $USER_ID2 --gas 300$TGAS
+```
+
+
+### Some manual CLI on REF an tokens:
 ```bash
 near call $REF remove_liquidity '{"min_amounts": ["594352005602050000000000","1373425444667410000000000"],"pool_id": 17, "shares": "1009680522490590000000000000"}' --accountId $CONTRACT_ID --depositYocto 1 --gas 80$TGAS
 
@@ -93,13 +97,21 @@ near call $REF_ID ft_transfer '{"receiver_id":"'$USER_ID'","amount":"75331222793
 
 near call $WNEAR ft_transfer '{"receiver_id":"'$USER_ID'","amount":"1733029503802090316150369"}' --accountId $CONTRACT_ID --depositYocto 1 --gas 80$TGAS
 
-near view $REF get_pool_shares '{"pool_id": 50, "account_id": "'$CONTRACT_ID'"}'
+near view $REF get_pool_shares '{"pool_id": 17, "account_id": "'$CONTRACT_ID'"}'
 
-near view $REF get_pool '{"pool_id": 17}'
+near view $CONTRACT_ID get_pools '{"account_id":"'$USER_ID2'"}'
+
+near view $CONTRACT_ID get_farms '{"account_id":"'$USER_ID2'"}'
+
+near view $REF_FARM get_farmer_seed '{"farmer_id":"'$CONTRACT_ID'","seed_id":"ref-finance-101.testnet@17"}'
+
+near call $CONTRACT_ID modify_pool '{"account_id":"'$USER_ID'","pool_id":"17","shares":"800000000000000000000000000"}' --accountId $USER_ID --gas 60$TGAS
+
+near call $CONTRACT_ID modify_farm '{"account_id":"'$USER_ID2'","farm_id":"50","amount":"981592273212832991262629"}' --accountId $USER_ID
 
 near view $REF_FARM list_seeds_info ''
 
-near view $REF_FARM get_unclaimed_rewards '{"farmer_id": "'$USER_ID'", "seed_id": "ref-finance-101.testnet@17"}'
+near view $REF_FARM get_unclaimed_rewards '{"farmer_id": "'$CONTRACT_ID'", "seed_id": "ref-finance-101.testnet@17"}'
 
 near call $REF_FARM claim_reward_by_seed '{"seed_id":"ref-finance-101.testnet@17"}' --accountId $CONTRACT_ID --gas 150$TGAS
 ```

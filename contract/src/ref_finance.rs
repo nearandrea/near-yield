@@ -7,6 +7,7 @@ trait RefFinance {
     fn add_liquidity(&self, pool_id: u64, amounts: Vec<U128>) -> U128;
     fn remove_liquidity(&self, min_amounts: Vec<U128>, pool_id: u64, shares: U128) -> Vec<U128>;
     fn withdraw(&self, token_id: AccountId, amount: U128, unregister: bool) -> U128;
+    fn mft_transfer_call(amount: U128, msg: String, receiver_id: AccountId, token_id: String);
 }
 
 #[ext_contract(ext_handle_token)]
@@ -48,8 +49,8 @@ impl Contract {
     }
 
     pub fn call_remove_liquidity(&mut self, min_amounts: Vec<U128>, pool_id: u64, shares: U128, token1: String, token2: String) -> PromiseOrValue<U128> {
-        if let Some(farm_data) = self.farmers.get(&env::predecessor_account_id()) {
-            if let Some(current_shares) = farm_data.pools.get(&pool_id.to_string()) {
+        if let Some(pool_data) = self.poolers.get(&env::predecessor_account_id()) {
+            if let Some(current_shares) = pool_data.pools.get(&pool_id.to_string()) {
                 if current_shares >= u128::from(shares) {
                     let p1 = ext_ref_finance::ext(REF_CONTRACT.parse().unwrap())
                         .with_attached_deposit(DEPOSIT_YOCTO)
@@ -102,7 +103,7 @@ impl Contract {
             log!("The last result is {}", result);
             if let Some(mut user_balance) = self.user_balance.get(&account_id.clone()) {
                 // add farm
-                self.add_farmer(account_id, pool_id, U128(result.parse::<u128>().unwrap()));
+                self.add_pooler(account_id, pool_id, U128(result.parse::<u128>().unwrap()));
                 
                 // modify user balance
                 if user_balance.tokens.get(&token1).unwrap_or(0) >= u128::from(amounts[0]) && user_balance.tokens.get(&token2).unwrap_or(0) >= u128::from(amounts[1]) {
@@ -131,9 +132,9 @@ impl Contract {
         #[callback_result] last_result: Result<Vec<U128>, PromiseError>,
     ) -> String {
         // The callback only has access to the last action's result
-        if let Ok(result) = last_result {
+        if let Ok(_result) = last_result {
             log!("{} remove {} for pool {}", account_id.clone().to_string(), u128::from(shares).to_string() , pool_id);
-            self.remove_farmer(account_id, pool_id, shares);
+            self.remove_pooler(account_id, pool_id, shares);
             "OK".to_string()
         } else {
             log!("The batch call failed and all calls got reverted");
@@ -157,36 +158,36 @@ impl Contract {
         }
     }
 
-    fn add_farmer(&mut self, account_id: AccountId, pool_id: String, amount: U128) -> U128{
-        log!("Add farmer: {} ,Pool Id: {}", account_id.clone().to_string(), pool_id);
-        if let Some(mut farm_data) = self.farmers.get(&account_id.clone()) {
-            log!("Farm data existed!");
-            let mut pools = farm_data.pools;
+    fn add_pooler(&mut self, account_id: AccountId, pool_id: String, amount: U128) -> U128{
+        log!("Add pooler: {} ,Pool Id: {}", account_id.clone().to_string(), pool_id);
+        if let Some(mut pool_data) = self.poolers.get(&account_id.clone()) {
+            log!("Pool data existed!");
+            let mut pools = pool_data.pools;
             if let Some(mut current_amount) = pools.get(&pool_id) {
                 current_amount += u128::from(amount);
                 pools.insert(&pool_id, &current_amount);
             } else {
                 pools.insert(&pool_id, &u128::from(amount));
             }
-            farm_data.pools = pools;
-            self.farmers.insert(&account_id.clone(), &farm_data);
+            pool_data.pools = pools;
+            self.poolers.insert(&account_id.clone(), &pool_data);
         } else {
-            log!("Create new farm data!");
+            log!("Create new pool data!");
             let mut new_pools = UnorderedMap::new(StorageKey::Pools { account_id: account_id.clone()});
             new_pools.insert(&pool_id, &u128::from(amount));
-            self.farmers.insert(&account_id.clone(), &FarmData {pools: new_pools});
+            self.poolers.insert(&account_id.clone(), &PoolData {pools: new_pools});
         }
         return amount;
     }
 
-    fn remove_farmer(&mut self, account_id: AccountId, pool_id: String, amount: U128) -> U128{
-        log!("Remove farmer: {} ,Pool Id: {}", account_id.clone().to_string(), pool_id);
-        if let Some(mut farm_data) = self.farmers.get(&account_id.clone()) {
-            if let Some(mut current_amount) = farm_data.pools.get(&pool_id) {
+    fn remove_pooler(&mut self, account_id: AccountId, pool_id: String, amount: U128) -> U128{
+        log!("Remove pooler: {} ,Pool Id: {}", account_id.clone().to_string(), pool_id);
+        if let Some(mut pool_data) = self.poolers.get(&account_id.clone()) {
+            if let Some(mut current_amount) = pool_data.pools.get(&pool_id) {
                 assert!(u128::from(amount) <= current_amount,"{}", ERR200_NOT_ENOUGH);
                 current_amount = current_amount - u128::from(amount);
-                farm_data.pools.insert(&pool_id, &current_amount);
-                self.farmers.insert(&account_id.clone(), &farm_data);
+                pool_data.pools.insert(&pool_id, &current_amount);
+                self.poolers.insert(&account_id.clone(), &pool_data);
             } else {
                 env::panic_str(ERR200_NOT_ENOUGH);
             }
@@ -194,5 +195,37 @@ impl Contract {
             env::panic_str(ERR200_NOT_ENOUGH);
         }
         amount
+    }
+
+    pub fn call_mft_transfer_call(&self, amount: U128, pool_id: String) -> PromiseOrValue<U128> {
+        log!("Add farm: {} ,shares: {}", pool_id.clone(), u128::from(amount).to_string());
+        // Remove : from pool id
+        let parsed_pool_id = self.parse_pool_id(pool_id.clone());
+        
+        // Check pool balance
+        self.assert_pool_balance(env::predecessor_account_id().clone(), parsed_pool_id.clone(), amount.clone());
+        
+        let p1 = ext_ref_finance::ext(REF_CONTRACT.parse().unwrap())
+                    .with_attached_deposit(DEPOSIT_YOCTO)
+                    .with_static_gas(FT_CALL_WITHDRAW_TGAS)
+                    .mft_transfer_call(amount, "\"Free\"".to_string(), REF_FARM_CONTRACT.parse().unwrap(), pool_id.clone());
+        
+        let p2 = Self::ext(env::current_account_id())
+                    .mft_transfer_callback(amount.clone(), parsed_pool_id.clone(), env::predecessor_account_id().clone());
+        p1.then(p2);
+        PromiseOrValue::Value(amount)
+    }
+
+    #[private]
+    pub fn mft_transfer_callback(&mut self, amount: U128, pool_id: String, account_id: AccountId,
+        #[callback_result] last_result: Result<U128, PromiseError>,) 
+    -> String {
+        if let Ok(_result) = last_result {
+            self.transfer_pool_to_farm(account_id, pool_id, amount);
+            "OK".to_string()
+        } else {
+            log!("The batch call failed and all calls got reverted");
+            "".to_string()
+        }
     }
 }

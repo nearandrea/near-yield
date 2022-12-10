@@ -43,7 +43,7 @@ impl Contract {
     pub fn withdraw_max(&mut self, token_id: AccountId) -> U128 {
         if let Some(mut user_balance) = self.user_balance.get(&env::predecessor_account_id().clone()) {
             let mut tokens = user_balance.tokens;
-            let mut amount = 0;
+            let mut amount;
             if let Some(current_amount) = tokens.get(&(token_id.clone().to_string())) {
                 amount = current_amount;
                 tokens.insert(&(token_id.clone().to_string()), &0);

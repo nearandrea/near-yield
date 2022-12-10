@@ -22,17 +22,24 @@ mod internals;
 #[derive(BorshStorageKey, BorshSerialize)]
 pub(crate) enum StorageKey {
     Stakes,
+    Poolers,
     Farmers,
     UserBalance,
     Pools {account_id: AccountId},
     Tokens {account_id: AccountId},
+    Farms {account_id: AccountId},
 }
-
-// impl BorshIntoStorageKey for StorageKey {}
 
 #[derive(BorshSerialize, BorshDeserialize, Serialize)]
 #[serde(crate = "near_sdk::serde")]
 pub struct FarmData {
+    #[serde(skip_serializing)]
+    pub farms: UnorderedMap<FarmId, Amount>
+}
+
+#[derive(BorshSerialize, BorshDeserialize, Serialize)]
+#[serde(crate = "near_sdk::serde")]
+pub struct PoolData {
     #[serde(skip_serializing)]
     pub pools: UnorderedMap<PoolId, Amount>
 }
@@ -51,6 +58,7 @@ pub struct Contract {
     pub message: String,
     pub owner_id: AccountId,
     pub stake_list: UnorderedMap<String, u128>,
+    pub poolers: UnorderedMap<AccountId, PoolData>,
     pub farmers: UnorderedMap<AccountId, FarmData>,
     pub user_balance: UnorderedMap<AccountId, UserBalance>,
 }
@@ -61,6 +69,7 @@ impl Default for Contract {
             message: DEFAULT_MESSAGE.to_string(),
             owner_id: DEFAULT_OWNER.parse().unwrap(),
             stake_list: UnorderedMap::new(StorageKey::Stakes),
+            poolers: UnorderedMap::new(StorageKey::Poolers),
             farmers: UnorderedMap::new(StorageKey::Farmers),
             user_balance: UnorderedMap::new(StorageKey::UserBalance),
         }
@@ -76,6 +85,7 @@ impl Contract {
             owner_id: owner_id.clone(),
             message: message.to_string(),
             stake_list: UnorderedMap::new(StorageKey::Stakes),
+            poolers: UnorderedMap::new(StorageKey::Poolers),
             farmers: UnorderedMap::new(StorageKey::Farmers),
             user_balance: UnorderedMap::new(StorageKey::UserBalance),
         }
