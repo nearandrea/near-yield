@@ -1,7 +1,7 @@
 // Find all our documentation at https://docs.near.org
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::{log, near_bindgen, AccountId, env, Promise, Balance, PromiseOrValue, BorshStorageKey};
-use near_sdk::collections::{UnorderedMap, UnorderedSet};
+use near_sdk::collections::{UnorderedMap};
 use near_sdk::serde::Serialize;
 
 use crate::utils::*;

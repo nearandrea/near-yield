@@ -1,5 +1,5 @@
 use crate::*;
-use near_sdk::{env, log, near_bindgen};
+use near_sdk::{log, near_bindgen};
 use near_sdk::json_types::U128;
 use near_sdk::borsh::{self, BorshDeserialize, BorshSerialize};
 use near_sdk::serde::Serialize;

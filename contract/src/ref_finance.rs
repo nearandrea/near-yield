@@ -1,6 +1,7 @@
 use crate::*;
-use near_sdk::{env, log, near_bindgen, Promise, PromiseError,ext_contract};
+use near_sdk::{env, log, near_bindgen, PromiseError,ext_contract};
 use near_sdk::json_types::U128;
+use std::collections::HashMap;
 
 #[ext_contract(ext_ref_finance)]
 trait RefFinance {
@@ -8,6 +9,14 @@ trait RefFinance {
     fn remove_liquidity(&self, min_amounts: Vec<U128>, pool_id: u64, shares: U128) -> Vec<U128>;
     fn withdraw(&self, token_id: AccountId, amount: U128, unregister: bool) -> U128;
     fn mft_transfer_call(amount: U128, msg: String, receiver_id: AccountId, token_id: String);
+}
+
+#[ext_contract(ext_ref_farm)]
+trait RefFarm {
+    fn claim_reward_by_seed(&self, seed_id: String) -> String;
+    fn withdraw_reward(&self, token_id: String) -> bool;
+    fn unlock_and_withdraw_seed(&self, seed_id: String, unlock_amount: U128, withdraw_amount: U128) -> bool;
+    fn list_farmer_rewards(&self, farmer_id: AccountId) -> HashMap<AccountId, U128>;
 }
 
 #[ext_contract(ext_handle_token)]
@@ -23,12 +32,12 @@ impl Contract {
             if user_balance.tokens.get(&token1).unwrap_or(0) >= u128::from(amounts[0]) && user_balance.tokens.get(&token2).unwrap_or(0) >= u128::from(amounts[1]) {
                 let p1 = ext_handle_token::ext(token1.parse().unwrap())
                     .with_attached_deposit(DEPOSIT_YOCTO)
-                    .with_static_gas(FT_CALL_GAS)
+                    .with_static_gas(FT_CALL_35_TGAS)
                     .ft_transfer_call(REF_CONTRACT.parse().unwrap(),amounts[0], "");
                 
                 let p2 = ext_handle_token::ext(token2.parse().unwrap())
                     .with_attached_deposit(DEPOSIT_YOCTO)
-                    .with_static_gas(FT_CALL_GAS)
+                    .with_static_gas(FT_CALL_35_TGAS)
                     .ft_transfer_call(REF_CONTRACT.parse().unwrap(),amounts[1], "");
                 
                 let p3 = ext_ref_finance::ext(REF_CONTRACT.parse().unwrap())
@@ -60,7 +69,7 @@ impl Contract {
                         .remove_liquidity_callback(env::predecessor_account_id().clone(), pool_id.to_string(), shares);
 
                     let p2 = ext_ref_finance::ext(REF_CONTRACT.parse().unwrap())
-                        .with_static_gas(FT_CALL_WITHDRAW_TGAS)
+                        .with_static_gas(FT_CALL_60_TGAS)
                         .with_attached_deposit(DEPOSIT_YOCTO)
                         .withdraw(token1.parse().unwrap(), U128(0), false);
                     
@@ -68,7 +77,7 @@ impl Contract {
                         .withdraw_callback(env::predecessor_account_id().clone(), token1);
                     
                     let p3 = ext_ref_finance::ext(REF_CONTRACT.parse().unwrap())
-                        .with_static_gas(FT_CALL_WITHDRAW_TGAS)
+                        .with_static_gas(FT_CALL_60_TGAS)
                         .with_attached_deposit(DEPOSIT_YOCTO)
                         .withdraw(token2.parse().unwrap(), U128(0), false);
                     
@@ -207,7 +216,7 @@ impl Contract {
         
         let p1 = ext_ref_finance::ext(REF_CONTRACT.parse().unwrap())
                     .with_attached_deposit(DEPOSIT_YOCTO)
-                    .with_static_gas(FT_CALL_WITHDRAW_TGAS)
+                    .with_static_gas(FT_CALL_60_TGAS)
                     .mft_transfer_call(amount, "\"Free\"".to_string(), REF_FARM_CONTRACT.parse().unwrap(), pool_id.clone());
         
         let p2 = Self::ext(env::current_account_id())
@@ -218,10 +227,57 @@ impl Contract {
 
     #[private]
     pub fn mft_transfer_callback(&mut self, amount: U128, pool_id: String, account_id: AccountId,
-        #[callback_result] last_result: Result<U128, PromiseError>,) 
-    -> String {
+        #[callback_result] last_result: Result<U128, PromiseError>,
+    ) -> String {
         if let Ok(_result) = last_result {
             self.transfer_pool_to_farm(account_id, pool_id, amount);
+            "OK".to_string()
+        } else {
+            log!("The batch call failed and all calls got reverted");
+            "".to_string()
+        }
+    }
+
+    pub fn call_claim_reward_by_seed(&self, seed_id: String) -> PromiseOrValue<U128> {
+        self.assert_owner();
+        ext_ref_farm::ext(REF_FARM_CONTRACT.parse().unwrap())
+                    .with_static_gas(FT_CALL_35_TGAS)
+                    .claim_reward_by_seed(seed_id.clone());
+        PromiseOrValue::Value(U128(0))
+    }
+
+    
+    pub fn call_withdraw_reward(&self, token_id: String) -> PromiseOrValue<U128> {
+        self.assert_owner();
+        ext_ref_farm::ext(REF_FARM_CONTRACT.parse().unwrap())
+            .with_static_gas(FT_CALL_45_TGAS)
+            .withdraw_reward(token_id.to_string());
+        PromiseOrValue::Value(U128(0))
+    }
+
+    pub fn call_unlock_and_withdraw_seed(&self, seed_id: String, amount: U128) -> PromiseOrValue<U128> {
+        //Check farm balance
+        let parsed_pool_id = self.parse_pool_id_from_seed_id(seed_id.clone());
+        self.assert_farm_balance(env::predecessor_account_id().clone(), parsed_pool_id.clone(), amount.clone());
+        //Call xcc to ref farm
+        let p1 = ext_ref_farm::ext(REF_FARM_CONTRACT.parse().unwrap())
+                    .with_static_gas(FT_CALL_45_TGAS)
+                    .with_attached_deposit(DEPOSIT_YOCTO)
+                    .unlock_and_withdraw_seed(seed_id.clone(), U128(0), amount);
+
+        //Call back to update user's farm transfer to pool
+        let p2 = Self::ext(env::current_account_id())
+                    .unlock_and_withdraw_seed_callback(amount.clone(), parsed_pool_id.clone(), env::predecessor_account_id().clone());  
+        p1.then(p2);
+        PromiseOrValue::Value(U128(0))
+    }
+
+    #[private]
+    pub fn unlock_and_withdraw_seed_callback(&mut self, amount: U128, pool_id: String, account_id: AccountId,
+        #[callback_result] last_result: Result<bool, PromiseError>,
+    ) -> String {
+        if let Ok(_result) = last_result {
+            self.transfer_farm_to_pool(account_id, pool_id, amount);
             "OK".to_string()
         } else {
             log!("The batch call failed and all calls got reverted");

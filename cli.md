@@ -74,14 +74,26 @@ near call $CONTRACT_ID call_add_liquidity '{"pool_id":17,"amounts":["20996560724
 
 ### 7. Call remove liquidity:
 ```bash
-near call $CONTRACT_ID call_remove_liquidity '{"pool_id":17,"min_amounts":["12690898030652000000000000","29984768236681000000000000"],"shares":"21799786546381006101493278010","token1":"'$REF_ID'", "token2": "'$WNEAR'"}' --accountId $USER_ID2 --gas 300$TGAS && \
+near call $CONTRACT_ID call_remove_liquidity '{"pool_id":17,"min_amounts":["4822648547890330000000000","11472992805501600000000000"],"shares":"8312577166003880000000000000","token1":"'$REF_ID'", "token2": "'$WNEAR'"}' --accountId $USER_ID2 --gas 300$TGAS && \
 near call $CONTRACT_ID withdraw_max '{"token_id":"'$REF_ID'"}' --accountId $USER_ID2 --gas 100$TGAS && \
 near call $CONTRACT_ID withdraw_max '{"token_id":"'$WNEAR'"}' --accountId $USER_ID2 --gas 100$TGAS
 ```
 
-## III. Add Farm:
+## III. Add & remove farm:
 ```bash
-near call $CONTRACT_ID call_mft_transfer_call '{"amount":"8312577166003884374257641527","pool_id":":17"}' --accountId $USER_ID2 --gas 300$TGAS
+near call $CONTRACT_ID call_mft_transfer_call '{"amount":"800000000000000000000000","pool_id":":50"}' --accountId $USER_ID2 --gas 300$TGAS
+
+near call $CONTRACT_ID call_unlock_and_withdraw_seed '{"seed_id":"ref-finance-101.testnet@17","amount":"5000000000000000000000000000"}' --accountId $USER_ID2 --gas 300$TGAS
+```
+
+## IV. Claim Contract FARM reward:
+``` bash
+near call $CONTRACT_ID call_claim_reward_by_seed '{"seed_id":"ref-finance-101.testnet@50"}' --accountId $USER_ID2 --gas 300$TGAS
+
+# Get reward in withdraw box
+near view $REF_FARM list_farmer_rewards '{"farmer_id":"'$CONTRACT_ID'"}'
+
+near call $CONTRACT_ID call_withdraw_reward '{"token_id":"ref.fakes.testnet"}' --accountId $USER_ID --gas 300$TGAS
 ```
 
 
@@ -97,22 +109,27 @@ near call $REF_ID ft_transfer '{"receiver_id":"'$USER_ID'","amount":"75331222793
 
 near call $WNEAR ft_transfer '{"receiver_id":"'$USER_ID'","amount":"1733029503802090316150369"}' --accountId $CONTRACT_ID --depositYocto 1 --gas 80$TGAS
 
-near view $REF get_pool_shares '{"pool_id": 17, "account_id": "'$CONTRACT_ID'"}'
+near view $REF get_pool_shares '{"pool_id": 50, "account_id": "'$CONTRACT_ID'"}'
 
 near view $CONTRACT_ID get_pools '{"account_id":"'$USER_ID2'"}'
 
 near view $CONTRACT_ID get_farms '{"account_id":"'$USER_ID2'"}'
 
-near view $REF_FARM get_farmer_seed '{"farmer_id":"'$CONTRACT_ID'","seed_id":"ref-finance-101.testnet@17"}'
+near view $REF_FARM get_farmer_seed '{"farmer_id":"'$CONTRACT_ID'","seed_id":"ref-finance-101.testnet@50"}'
 
-near call $CONTRACT_ID modify_pool '{"account_id":"'$USER_ID'","pool_id":"17","shares":"800000000000000000000000000"}' --accountId $USER_ID --gas 60$TGAS
+near call $CONTRACT_ID modify_pool '{"account_id":"'$USER_ID'","pool_id":"17","shares":"800000000000000000000000000"}' --accountId $USER_ID 
 
 near call $CONTRACT_ID modify_farm '{"account_id":"'$USER_ID2'","farm_id":"50","amount":"981592273212832991262629"}' --accountId $USER_ID
 
 near view $REF_FARM list_seeds_info ''
 
-near view $REF_FARM get_unclaimed_rewards '{"farmer_id": "'$CONTRACT_ID'", "seed_id": "ref-finance-101.testnet@17"}'
+# Get unreward in seed
+near view $REF_FARM get_unclaimed_rewards '{"farmer_id": "'$CONTRACT_ID'", "seed_id": "ref-finance-101.testnet@50"}'
 
-near call $REF_FARM claim_reward_by_seed '{"seed_id":"ref-finance-101.testnet@17"}' --accountId $CONTRACT_ID --gas 150$TGAS
+near call $REF_FARM claim_reward_by_seed '{"seed_id":"ref-finance-101.testnet@50"}' --accountId $USER_ID2 --gas 35$TGAS
+
+near call $REF_FARM withdraw_reward '{"token_id":"ref.fakes.testnet"}' --accountId $USER_ID2 --gas 45$TGAS
+
+near call $REF_FARM unlock_and_withdraw_seed '{"seed_id":"ref-finance-101.testnet@50", "unlock_amount": "0", "withdraw_amount": "200000000000000000000000"}' --accountId $USER_ID2 --depositYocto 1 --gas 45$TGAS
 ```
 
